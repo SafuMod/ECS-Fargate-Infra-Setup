@@ -1,0 +1,212 @@
+executionRoleArn: <+stage.variables.executionRoleArn>
+taskRoleArn: <+stage.variables.taskRoleArn>
+
+requiresCompatibilities:
+  - FARGATE
+family: <+stage.variables.ApplicationCI>-<+stage.variables.project>-TaskDefinition-<+stage.variables.env>-<+stage.variables.AWS_REGION>
+networkMode: awsvpc
+cpu: <+stage.variables.cpu>
+memory: <+stage.variables.memory>
+runtimePlatform:
+  cpuArchitecture: ARM64
+volumes:
+  - name: <+stage.variables.ApplicationCI>-app-volume
+    hostPath:
+      path: "/app"
+  - name: fluent-bit-volume
+    hostPath:
+      path: "/tmp"
+  - name: dynatrace-volume
+    hostPath:
+      path: "/opt"
+requiresAttributes: []
+placementConstraints: []
+compatibilities: []
+inferenceAccelerators: []
+containerDefinitions:
+  - name: dynatrace-oneagent
+    image: <+stage.variables.DTImage>
+    readonlyRootFilesystem: "true"
+    repositoryCredentials:
+      credentialsParameter: arn:aws:secretsmanager:us-east-2:022904534727:secret:dql-artifactory-credentials-lower-G1cbX9
+    essential: false
+    portMappings:
+      - containerPort: 9999
+        hostPort: 9999
+        protocol: tcp
+    entryPoint:
+      - "sh"
+      - "-c"
+      - ARCHIVE=$(mktemp) && wget --no-check-certificate -O $ARCHIVE "$DT_API_URL/v1/deployment/installer/agent/unix/paas/version/1.315.68.20250627-182234?arch=arm&Api-Token=$DT_PAAS_TOKEN&$DT_ONEAGENT_OPTIONS" && unzip -o -d /opt/dynatrace/oneagent $ARCHIVE && rm -f $ARCHIVE
+    mountPoints:
+      - containerPath: /opt/dynatrace/oneagent
+        sourceVolume: dynatrace-volume
+        readOnly: "false"
+      - containerPath: /tmp
+        sourceVolume: fluent-bit-volume
+        readOnly: "false"
+    environment:
+      - name: DT_API_URL
+        value: <+stage.variables.DT_API_URL>
+      - name: DT_ONEAGENT_OPTIONS
+        value: flavor=default&include=all
+      - name: DT_PAAS_TOKEN
+        value: <+stage.variables.DTAPITOKEN>
+      - name: DT_LOGLEVELCON
+        value: INFO
+    logConfiguration:
+      logDriver: awslogs
+      options:
+        awslogs-group: /ecs/saf/dynatrace
+        awslogs-region: <+stage.variables.AWS_REGION>
+        awslogs-create-group: true
+        awslogs-stream-prefix: ecs
+
+  - name: <+stage.variables.ApplicationCI>-<+stage.variables.serviceName>
+    image: "<+artifact.image>"
+    readonlyRootFilesystem: "true"
+    repositoryCredentials:
+      credentialsParameter: arn:aws:secretsmanager:us-east-2:022904534727:secret:dql-artifactory-credentials-lower-G1cbX9
+    portMappings:
+      - containerPort: <+stage.variables.containerPort>
+    environment:
+      - name: Java_ENVIRONMENT
+        value: <+stage.variables.env>
+      - name: testAWSREGION
+        value: <+stage.variables.awsregion>
+      - name: ENVIRONMENT
+        value: <+stage.variables.env>
+      - name: Subnet1CIDR
+        value: <+stage.variables.Subnet1CIDR>
+      - name: Subnet2CIDR
+        value: <+stage.variables.Subnet2CIDR>
+      - name: Subnet3CIDR
+        value: <+stage.variables.Subnet3CIDR>
+      - name: MinContainers
+        value: <+stage.variables.MinContainers>
+      - name: MaxContainers
+        value: <+stage.variables.MaxContainers>
+      - name: testAWSPROFILE
+        value: <+stage.variables.testAWSPROFILE>
+      - name: testAWSKINESISSTREAMARN
+        value: <+stage.variables.testAWSKINESISSTREAMARN>
+      - name: XCLRDNS
+        value: <+stage.variables.XCLRDNS>
+      - name: testDNSName
+        value: <+stage.variables.testDNSName>
+      - name: testEnvironment
+        value: <+stage.variables.testEnvironment>
+      - name: testHostedZoneID
+        value: <+stage.variables.testHostedZoneID>
+      - name: xclrHostedZoneID
+        value: <+stage.variables.xclrHostedZoneID>
+      - name: xclrHarnessTaskExecutionRole
+        value: <+stage.variables.xclrHarnessTaskExecutionRole>
+      - name: aerodataProcessingEnabled
+        value: <+stage.variables.aerodataProcessingEnabled>
+      - name: skywestProcessingEnabled
+        value: <+stage.variables.skywestProcessingEnabled>
+      - name: volareSkyWestProcessingEnabled
+        value: <+stage.variables.volareSkyWestProcessingEnabled>
+      - name: volareAeroDataProcessingEnabled
+        value: <+stage.variables.volareAeroDataProcessingEnabled>
+      - name: DT_API_URL
+        value: <+stage.variables.DT_API_URL>
+      - name: DT_LOGLEVELCON
+        value: INFO
+      - name: LD_PRELOAD
+        value: /opt/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+      - name: DT_APPLICATION_ENVIRONMENT
+        value: <+stage.variables.DT_APPLICATION_ENVIRONMENT>
+      - name: DT_APPLICATION_NAME
+        value: <+stage.variables.DT_APPLICATION_NAME>
+      - name: DT_PROCESS_GROUP_NAME
+        value: <+stage.variables.DT_PROCESS_GROUP_NAME>
+      - name: DT_PAAS_TOKEN
+        value: <+stage.variables.DTAPITOKEN>
+      - name: DT_NGINX_FORCE_RUNTIME_INSTRUMENTATION
+        value: "on"
+      - name: DT_CUSTOM_PROP
+        value: "applicationci=<+stage.variables.ApplicationCI> env=<+stage.variables.DT_APPLICATION_ENVIRONMENT> servicename=<+stage.variables.serviceName> location=<+stage.variables.AWS_REGION> account=<+env.variables.AWSAccountID>"
+      - name: version
+        value: <+stage.variables.version>
+    dependsOn:
+      - containerName: dynatrace-oneagent
+        condition: COMPLETE
+    mountPoints:
+      - containerPath: /app
+        sourceVolume: <+stage.variables.ApplicationCI>-app-volume
+        readOnly: "false"
+      - containerPath: /opt/dynatrace/oneagent
+        sourceVolume: dynatrace-volume
+        readOnly: "false"
+      - containerPath: /tmp
+        sourceVolume: fluent-bit-volume
+        readOnly: "false"
+
+    logConfiguration:
+      logDriver: awsfirelens
+      dependsOn:
+        - containerName: saf-log-router
+          condition: START
+      MemoryReservation: 100
+#      options:
+#        awslogs-group: <+stage.variables.AWS_LOG_GROUP>
+#        awslogs-region: us-east-1
+#        awslogs-create-group: true
+#        awslogs-stream-prefix: <+stage.variables.AWS_LOG_STREAM_PREFIX>
+
+  - name: saf-log-router
+    image: <+stage.variables.fluentImage>
+    readonlyRootFilesystem: "true"
+    repositoryCredentials:
+      credentialsParameter: arn:aws:secretsmanager:us-east-2:022904534727:secret:dql-artifactory-credentials-lower-G1cbX9
+    essential: 'true'
+    mountPoints:
+      - containerPath: /tmp/fluent-bit-config
+        sourceVolume: fluent-bit-volume
+        readOnly: "false"
+      - containerPath: /tmp
+        sourceVolume: fluent-bit-volume
+        readOnly: "false"
+    firelensConfiguration:
+      type: fluentbit
+      options:
+        enable-ecs-log-metadata: true
+        config-file-type: file
+        config-file-value: /tmp/fluent-bit-config/graviton-saf-test.conf
+    environment:
+      - name: AWS_REGION
+        value: <+stage.variables.AWS_REGION>
+      - name: DT_INGESTION_HOST
+        value: <+stage.variables.DT_INGESTION_HOST>
+      - name: DT_INGESTION_URL
+        value: <+stage.variables.DT_INGESTION_URL>
+      - name: ENVIRONMENT_TYPE
+        value: <+stage.variables.env>
+      - name: DT_ENVIRONMENT
+        value: <+stage.variables.env>
+      - name: DT_APPLICATION_CI
+        value: <+stage.variables.ApplicationCI>
+      - name: DT_REGION
+        value: <+stage.variables.AWS_REGION>
+      - name: OS_COLLECTION_ENDPOINT
+        value: <+stage.variables.OS_COLLECTION_ENDPOINT>
+      - name: OS_COLLECTION_PORT
+        value: <+stage.variables.OS_COLLECTION_PORT>
+      - name: OS_COLLECTION_INDEX
+        value: <+stage.variables.OS_COLLECTION_INDEX>
+    logConfiguration:
+      logDriver: awslogs
+      options:
+        awslogs-group: <+stage.variables.AWS_LOG_GROUP>
+        awslogs-region: <+stage.variables.AWS_REGION>
+        awslogs-create-group: true
+        awslogs-stream-prefix: saffirelens
+    MemoryReservation: 50
+
+tags:
+  - key: ApplicationCI
+    value: <+stage.variables.ApplicationCI>
+  - key: env
+    value: <+stage.variables.env>

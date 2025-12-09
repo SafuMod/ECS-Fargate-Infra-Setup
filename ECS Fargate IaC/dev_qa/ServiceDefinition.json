@@ -1,0 +1,72 @@
+{
+  "capacityProviderStrategy": [],
+  "launchType": "FARGATE",
+  "placementConstraints": [],
+  "placementStrategy": [],
+  "healthCheckGracePeriodSeconds": 500,
+  "serviceName": "<+stage.variables.ApplicationCI>-<+stage.variables.serviceName>",
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100
+  },
+  "loadBalancers": [{
+    "containerName": "<+stage.variables.ApplicationCI>-<+stage.variables.serviceName>",
+    "containerPort": 8080,
+    "targetGroupArn": "<+stage.variables.targetGroupArn>"
+  }],
+  "TargetGroup": {
+    "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+    "Properties": {
+      "Name": "<+stage.variables.ApplicationCI><+stage.variables.serviceName>InterLB-TG",
+      "HealthCheckPath": "<+stage.variables.HealthCheckPath>",
+      "HealthCheckEnabled": "True",
+      "HealthCheckIntervalSeconds": 15,
+      "UnhealthyThresholdCount": 2,
+      "HealthyThresholdCount": 3,
+      "HealthCheckTimeoutSeconds": 60,
+      "HealthCheckPort": 8080,
+      "HealthCheckProtocol": "HTTP",
+      "Port": 8080,
+      "Protocol": "HTTP",
+      "TargetGroupAttributes": {
+        "Key": "deregistration_delay.timeout_seconds",
+        "Value": 30
+      },
+      "TargetType": "ip",
+      "VpcId": "<+stage.variables.VpcId>"
+    }
+  },
+  "ListenerRuleHTTPS": {
+    "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+    "Properties": {
+      "ListenerArn": "<+stage.variables.ListenerArn>",
+      "Conditions": {
+        "Field": "path-pattern",
+        "Values": "*",
+        "Actions": {
+          "TargetGroupArn": <+stage.variables.TargetGroupArn>,
+          "Type": "forward"
+        }
+      }
+    }
+  },
+  "tags": [{
+    "key": "ApplicationCI",
+    "value": "<+stage.variables.ApplicationCI>"
+  },
+    {
+      "key": "Name",
+      "value": "harness-<+service.name>"
+    }
+  ],
+  "schedulingStrategy": "REPLICA",
+  "desiredCount": 2,
+  "propagateTags": "SERVICE",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": <+stage.variables.subnets>,
+      "securityGroups": <+stage.variables.securityGroups>,
+      "assignPublicIp": "DISABLED"
+    }
+  }
+}

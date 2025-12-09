@@ -1,0 +1,10 @@
+scalableDimension: ecs:service:DesiredCount
+serviceNamespace: ecs
+policyName: <+stage.variables.policyName>
+policyType: TargetTrackingScaling
+targetTrackingScalingPolicyConfiguration:
+  targetValue: <+stage.variables.targetValue>
+  predefinedMetricSpecification:
+    predefinedMetricType: ECSServiceAverageCPUUtilization
+  scaleOutCooldown: <+stage.variables.scaleOutCooldown>
+  scaleInCooldown: <+stage.variables.scaleInCooldown>

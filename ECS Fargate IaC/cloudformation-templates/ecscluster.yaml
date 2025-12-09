@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A Cloud Formation Template to Create an empty ECS Cluster and Security Group for Containers.
+
+Parameters:
+  ApplicationCI:
+    Type: String
+    Description: Lowercase ApplicationCI Example abc
+    Default: test
+  ClusterName:
+    Type: String
+    Default: safCluster
+  MaintenanceWindow:
+    Default: Tue:04:00-Tue:04:30
+    Type: String
+  SLALevel:
+    Default: 3
+    Type: String
+  RiskDataClass:
+    Default: Moderate:Confidential
+    Type: String
+  ApplicationContactDL:
+    Default: safwanmodak30@gmail.com
+    Type: String
+  InternalExternal:
+    Default: Internal
+    Type: String
+  RegulatoryControls:
+    Default: PII
+    Type: String
+  VPC:
+    Type: AWS::EC2::VPC::Id
+  ContainerPort:
+    Type: Number
+    Default: 8080
+  AppEnv:
+    Type: String
+    AllowedValues:
+      - DEV
+      - QA
+      - STG
+      - PRD
+
+Resources:
+  safCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${ApplicationCI}-${ClusterName}
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref ApplicationCI
+        - Key: SLALevel
+          Value: !Ref SLALevel
+        - Key: RiskDataClass
+          Value: !Ref RiskDataClass
+        - Key: ApplicationContactDL
+          Value: !Ref ApplicationContactDL
+        - Key: MaintenanceWindow
+          Value: !Ref MaintenanceWindow
+        - Key: InternalExternal
+          Value: !Ref InternalExternal
+        - Key: Name
+          Value: !Sub ${ApplicationCI}-${ClusterName}
+        - Key: RegulatoryControls
+          Value: !Ref RegulatoryControls
+        - Key: AppEnv
+          Value: !Ref AppEnv
+
+  safContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ApplicationCI}-ContainerSecurityGroup
+      VpcId: !Ref VPC
+      GroupName: !Sub ${ApplicationCI}-ContainerSecurityGroup
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref ApplicationCI
+        - Key: SLALevel
+          Value: !Ref SLALevel
+        - Key: RiskDataClass
+          Value: !Ref RiskDataClass
+        - Key: ApplicationContactDL
+          Value: !Ref ApplicationContactDL
+        - Key: MaintenanceWindow
+          Value: !Ref MaintenanceWindow
+        - Key: InternalExternal
+          Value: !Ref InternalExternal
+        - Key: Name
+          Value: !Sub ${ApplicationCI}-ContainerSecurityGroup
+        - Key: RegulatoryControls
+          Value: !Ref RegulatoryControls
+        - Key: AppEnv
+          Value: !Ref AppEnv
+
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId: !Sub '{{resolve:ssm:/${ApplicationCI}/ec2/InternalLoadBalancerSecurityGroup:1}}'
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+
+  # safContainerSecurityGroupParameter:
+  #   Type: AWS::SSM::Parameter
+  #   Properties:
+  #     Description: safContainerSecurityGroupParameter
+  #     Name: !Sub /${ApplicationCI}/ec2/ContainerSecurityGroup
+  #     Tags:
+  #       ApplicationCI : !Ref ApplicationCI
+  #     Tier: Standard
+  #     Type: String
+  #     Value: !Ref ContainerSecurityGroup
+
+Outputs:
+  ECSCluster:
+    Description: saf ECS Cluster
+    Value: !Ref safCluster
+    Export:
+      Name: !Sub ${ApplicationCI}-ECSCluster
+  ContainerSecurityGroup:
+    Description: saf ContainerSecurityGroup
+    Value: !Ref safContainerSecurityGroup
+    Export:
+      Name: !Sub ${ApplicationCI}-ContainerSecurityGroup

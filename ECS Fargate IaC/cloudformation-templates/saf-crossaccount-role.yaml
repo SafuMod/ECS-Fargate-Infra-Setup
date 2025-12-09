@@ -1,0 +1,81 @@
+Description: This template creates a Cross Account execution role for UDH to access Kinesis Data Stream in saf test account.
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Provides information on what the resource group is used for (useful for maintenance, policy enforcement, chargeback, etc.)
+    AllowedValues:
+      - dev
+      - qa
+      - stg
+      - prd
+    Default: dev
+
+  AppCI:
+    Description: CMDB ApplicationCI Name/Billing Identifier; 3 letter Application Key (CMDB/ServiceNow) - All lowercase
+    Type: String
+    Default: saf
+
+  ProjectName:
+    Description: Project Name
+    Type: String
+    Default: test
+
+
+Outputs:
+  EcsExecutionRoleOutput:
+    Description: ECS Execution role to export
+    Value: !GetAtt safUDHCROSSACCROLE.Arn
+    Export:
+      Name: !Sub Harness-${AppCI}-${ProjectName}-${Environment}-crossaccount-role
+
+
+Resources:
+  safUDHCROSSACCROLE:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub Harness-${AppCI}-${ProjectName}-${Environment}-crossaccount-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: arn:aws:iam::207138240216:role/cbs-udh-dev-databricks-s3-role-DBSInstanceProfileRole
+            Action: sts:AssumeRole
+
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/AppPolicy_Harness
+
+      Policies:
+        - PolicyName: KinesisReadPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: KinesisReadActions
+                Effect: Allow
+                Action:
+                  - kinesis:DescribeStream
+                  - kinesis:DescribeStreamSummary
+                  - kinesis:ListShards
+                  - kinesis:GetShardIterator
+                  - kinesis:GetRecords
+                  - kinesis:SubscribeToShard
+                Resource:
+                  - !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/saf-test-UDH-DATA-STREAM
+                  - !Sub arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/saf-test-UDH-DATA-STREAM/*
+
+              - Sid: KMSDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:GenerateDataKey
+                Resource:
+                  - !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/c38d8587-79f2-4252-81bf-04925446f105
+
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref AppCI
+        - Key: env
+          Value: !Ref Environment
+        - Key: Region
+          Value: !Sub "AWS: ${AWS::Region}"

@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This CloudFormation Template is used to create a Table in DynamoDB
+
+Parameters:
+  ApplicationCI:
+    Type: String
+    Description: Lowercase ApplicationCI Example abc
+    Default: saf
+  Environment:
+    Type: String
+    Description: Environment for the deployment Example dev qa stg prd
+    Default: dev
+  KinesisStreamArn:
+    Type: String
+    Description: ARN of the Kinesis Stream for DynamoDB -> Kinesis integration
+    Default: arn:aws:kinesis:us-east-1:651706779238:stream/saf-test-UDH-DATA-STREAM
+
+Resources:
+  saftestPlanTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: saf-test-plan
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: version
+          AttributeType: S
+        - AttributeName: testGsiId
+          AttributeType: S
+        - AttributeName: testGsiSortKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: version
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      KinesisStreamSpecification:
+        StreamArn: !Ref KinesisStreamArn
+      SSESpecification:
+        SSEEnabled: true
+      DeletionProtectionEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      GlobalSecondaryIndexes:
+        - IndexName: ETD_DATE_HOUR
+          KeySchema:
+            - AttributeName: testGsiId
+              KeyType: HASH
+            - AttributeName: testGsiSortKey
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref ApplicationCI
+        - Key: Environment
+          Value: !Ref Environment
+  saftestReferenceTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: saf-test-reference
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: type
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: type
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      DeletionProtectionEnabled: true
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref ApplicationCI
+        - Key: Environment
+          Value: !Ref Environment

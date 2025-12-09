@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: A Cloud Formation Template to Create a Target Group and Listener Rule for Load Balancer.
+Parameters:
+  ContainerPort:
+    Type: Number
+    Default: 8080
+  VPC:
+    Type: AWS::EC2::VPC::Id
+  ApplicationCI:
+    Type: String
+    Description: Lowercase ApplicationCI Example abc
+  ClusterName:
+    Type: String
+    Default: saf-safCluster
+  ServiceName:
+    Type: String
+  LoadBalancerPriority:
+    Type: Number
+  Listenerrule:
+    Type: String
+
+Resources:
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Join ["", [!Ref ApplicationCI, !Ref ServiceName, InterLB-TG]]
+      HealthCheckPath: "/api/health/"
+      HealthCheckEnabled: True
+      HealthCheckIntervalSeconds: 30
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 3
+      HealthCheckTimeoutSeconds: 25
+      HealthCheckPort: !Ref ContainerPort
+      HealthCheckProtocol: HTTP
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '60'
+      TargetType: ip
+      VpcId: !Ref VPC
+      Tags:
+        - Key: "ApplicationCI"
+          Value: !Ref ApplicationCI
+  ListenerRuleHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Priority: !Ref LoadBalancerPriority
+      ListenerArn: <+stage.variables.ListenerArn>
+      Conditions:
+        - Field: path-pattern
+          Values:
+             - /*
+#            - !Sub /${Listenerrule}/*
+      Actions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+
+Outputs:
+  TargetGroup:
+    Description: Deployed Service Target Group
+    Value: !Ref TargetGroup
+    Export:
+      Name: !Join ["", [!Ref ApplicationCI, !Ref ServiceName, InterLB-TG]]

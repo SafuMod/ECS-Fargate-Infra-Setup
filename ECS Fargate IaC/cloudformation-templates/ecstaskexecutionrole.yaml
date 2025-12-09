@@ -1,0 +1,174 @@
+Description: This template creates an ECS task execution role
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Provides information on what the resource group is used for (useful for maintenance, policy enforcement, chargeback, etc.)
+    AllowedValues:
+      - dev
+      - qa
+      - stg
+      - prd
+  AppCI:
+    Description: CMDB ApplicationCI Name/Billing Identifier; 3 letter Application Key (CMDB/ServiceNow) - All lowercase
+    Type: String
+
+  ProjectName:
+    Description: Project Name
+    Type: String
+
+Outputs:
+  EcsExecutionRoleOutput:
+    Description: ECS Execution role to export
+    Value: !GetAtt ECSTASKEXECUTIONROLE.Arn
+    Export:
+      Name:
+        Fn::Sub: Harness-${AppCI}-${ProjectName}-${Environment}-${AWS::Region}-taskexecution-role
+
+Resources:
+  ECSTASKEXECUTIONROLE:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: Harness-${AppCI}-${ProjectName}-${Environment}-${AWS::Region}-taskexecution-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "sts:AssumeRole"
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+      PermissionsBoundary:
+        Fn::Sub: arn:aws:iam::${AWS::AccountId}:policy/AppPolicy_Harness
+      Policies:
+        - PolicyName:
+            Fn::Sub: Harness-${AppCI}-${ProjectName}-${Environment}-${AWS::Region}-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - ssm:GetParameters
+                  - secretsmanager:GetSecretValue
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecs:RegisterTaskDefinition
+                  - ecs:CreateService
+                  - ecs:ListTasks
+                  - ecs:DescribeTasks
+                  - ecs:DeleteService
+                  - ecs:UpdateService
+                  - ecs:ListServices
+                  - ecs:ListClusters
+                  - ecs:DescribeServices
+                  - ecs:DescribeContainerInstances
+                  - ecs:DescribeTaskDefinition
+                  - iam:PassRole
+                  - iam:ListRoles
+                  - application-autoscaling:DescribeScalableTargets
+                  - application-autoscaling:DescribeScalingPolicies
+                  - application-autoscaling:DeregisterScalableTarget
+                  - application-autoscaling:RegisterScalableTarget
+                  - application-autoscaling:PutScalingPolicy
+                  - elasticloadbalancing:CreateTargetGroup
+                  - elasticloadbalancing:DeleteListener
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:DeleteRule
+                  - elasticloadbalancing:DeleteTargetGroup
+                  - elasticloadbalancing:DescribeListeners
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeRules
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - ec2:CreateNetworkInterface
+                  - ec2:DeleteNetworkInterface
+                  - ec2:DescribeDhcpOptions
+                  - ec2:DescribeInternetGateways
+                  - ec2:DescribeLocalGatewayRouteTablePermissions
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeTags
+                  - ec2:DescribeVpcs
+                  - ec2:CreateTags
+                  - kinesis:*
+                  - ecr:*
+                  - kms:*
+                  - dynamodb:*
+                  - dax:*
+                  - cloudwatch:*
+                  - secretsmanager:GetSecretValue
+                  - es:*
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                  - logs:GetLogEvents
+                  - logs:CreateLogGroup
+                  - logs:DescribeLogGroups
+                  - logs:PutRetentionPolicy
+                Resource: "*"
+        - PolicyName: AWSManagedPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:Describe*
+                  - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+                  - elasticloadbalancing:DeregisterTargets
+                  - elasticloadbalancing:Describe*
+                  - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+                  - elasticloadbalancing:RegisterTargets
+                Resource: "*"
+
+        - PolicyName: CloudWatchManagedPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:Describe*
+                  - cloudwatch:*
+                  - logs:*
+                  - sns:*
+                  - iam:GetPolicy
+                  - iam:GetPolicyVersion
+                  - iam:GetRole
+                  - oam:ListSinks
+                Resource: "*"
+              - Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: arn:aws:iam::*:role/aws-service-role/events.amazonaws.com/AWSServiceRoleForCloudWatchEvents*
+                Condition:
+                  StringLike:
+                    iam:AWSServiceName: events.amazonaws.com
+              - Effect: Allow
+                Action: oam:ListAttachedLinks
+                Resource: arn:aws:oam:*:*:sink/*
+        - PolicyName: IAMAssumeRoleonXCLR
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: "*"
+        - PolicyName: Route53ListResourceRecordSetsPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - route53:ListResourceRecordSets
+                Resource: "*"
+
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Region
+          Value:
+            Fn::Sub: "AWS: ${AWS::Region}"
+        - Key: ApplicationCI
+          Value: !Ref AppCI

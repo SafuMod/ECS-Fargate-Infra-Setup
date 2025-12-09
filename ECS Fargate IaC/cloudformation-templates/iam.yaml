@@ -1,0 +1,382 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: IAM Cloudformation template
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+  ApplicationCI:
+    Type: String
+    Default: saf
+
+Resources:
+  HarnesssafCDDelegateRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub Harness-${ApplicationCI}-CDDelegateRole
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/AppPolicy_Harness
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - 'arn:aws:iam::022904534727:role/harness-dry-eksnodegroup-cdprod-useast2-prd-role'
+                - 'arn:aws:iam::022904534727:role/harness-dry-eksnodegroup-cdnonprod-useast1-prd-role'
+                - 'arn:aws:iam::022904534727:role/harness-dry-eksnodegroup-cdprod-useast1-prd-role'
+                - 'arn:aws:iam::022904534727:role/harness-dry-eksnodegroup-cdstage-useast1-prd-role'
+                - 'arn:aws:iam::022904534727:role/harness-dry-eksnodegroup-cdstage-useast2-prd-role'
+                - 'arn:aws:iam::022904534727:role/harness-dry-eksnodegroup-cdnonprod-useast2-prd-role'
+                - 'arn:aws:iam::574441276315:role/PCR-MasterAccount-CloudEng-L0'
+                - 'arn:aws:iam::022904534727:role/eksctl-dry-harness-ci-nodegroup-d-NodeInstanceRole-15XIFAZ1XW1NQ'
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub Harness-${ApplicationCI}-DelegatePolicy1
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'route53:List*'
+                  - 'route53:Get*'
+                  - 'route53:ChangeResourceRecordSets'
+                  - 'route53:CreateHealthCheck'
+                  - 'route53:DeleteHealthCheck'
+                  - 'route53:GetHealthCheck'
+                  - 'route53:UpdateHealthCheck'
+                  - 'route53:AssociateVPCWithHostedZone'
+                Resource: 'arn:aws:route53:::hostedzone/Z09988446X6P0P6EYCO2'
+              - Effect: Allow
+                NotAction:
+                  - 'ram:*'
+                  - 'organizations:*'
+                  - 'ec2:*VpcEndpoint*'
+                  - 'cognito-sync:*'
+                  - 'cognito-idp:*'
+                  - 'cognito-identity:*'
+                  - 'cloudfront:*'
+                  - 'cloudformation:*'
+                  - 'aws-marketplace:*'
+                Resource: '*'
+              - Sid: CognitoPermissions
+                Effect: Allow
+                Action:
+                  - 'cognito-idp:List*'
+                  - 'cognito-idp:Describe*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'ec2:CreateVpcEndpoint'
+                Condition:
+                  'ForAnyValue:StringEquals':
+                    'aws:TagKeys': AmazonMWAAManaged
+                Resource: 'arn:aws:ec2:*:*:vpc-endpoint/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:ModifyVpcEndpoint'
+                  - 'ec2:DeleteVpcEndpoints'
+                Condition:
+                  'Null':
+                    'aws:ResourceTag/AmazonMWAAManaged': 'false'
+                Resource: 'arn:aws:ec2:*:*:vpc-endpoint/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:ModifyVpcEndpoint'
+                  - 'ec2:CreateVpcEndpoint'
+                Resource:
+                  - 'arn:aws:ec2:*:*:vpc/*'
+                  - 'arn:aws:ec2:*:*:subnet/*'
+                  - 'arn:aws:ec2:*:*:security-group/*'
+              - Sid: CloudFormationWrite
+                Effect: Allow
+                Action:
+                  - 'cloudformation:ContinueUpdateRollback'
+                  - 'cloudformation:CancelUpdateStack'
+                  - 'cloudformation:*Stack'
+                  - 'cloudformation:*ChangeSet'
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/harness-*/*'
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/saf-*/*'
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/Harness-*/*'
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/devops-oet-saf*'
+              - Sid: CloudFormationRead
+                Effect: Allow
+                Action:
+                  - 'ec2:DescribeVpcEndpoint*'
+                  - 'cloudformation:ValidateTemplate'
+                  - 'cloudformation:UntagResource'
+                  - 'cloudformation:TagResource'
+                  - 'cloudformation:List*'
+                  - 'cloudformation:GetTemplateSummary'
+                  - 'cloudformation:Get*'
+                  - 'cloudformation:EstimateTemplateCost'
+                  - 'cloudformation:Describe*'
+                  - 'cloudformation:CreateUploadBucket'
+                  - 'cloudformation:CreateChangeSet'
+                Resource: '*'
+              - Sid: EMRReadiness
+                Effect: Allow
+                Action: 'elasticmapreduce:*'
+                Resource: '*'
+              - Sid: ProtectLandingZone
+                Effect: Deny
+                Action:
+                  - 's3:PutBucketPublicAccessBlock'
+                  - 's3:PutAccountPublicAccessBlock'
+                  - 'route53:DeleteHostedZone'
+                  - 'route53:CreateVPCAssociationAuthorization'
+                  - 'route53:CreateHostedZone'
+                  - 'route53:AssociateVPCWithHostedZone'
+                  - 'ec2:UnassignIpv6Addresses'
+                  - 'ec2:RestoreAddressToClassic'
+                  - 'ec2:ReplaceRouteTableAssociation'
+                  - 'ec2:ReplaceRoute'
+                  - 'ec2:ReplaceNetworkAclEntry'
+                  - 'ec2:ReplaceNetworkAclAssociation'
+                  - 'ec2:RejectVpcPeeringConnection'
+                  - 'ec2:RejectVpcEndpointConnections'
+                  - 'ec2:PurchaseReservedInstancesOffering'
+                  - 'ec2:PurchaseHostReservation'
+                  - 'ec2:ModifyVpcTenancy'
+                  - 'ec2:ModifyVpcPeeringConnectionOptions'
+                  - 'ec2:ModifyVpcEndpointServicePermissions'
+                  - 'ec2:ModifyVpcEndpointServiceConfiguration'
+                  - 'ec2:ModifyVpcEndpointConnectionNotification'
+                  - 'ec2:ModifyVpcEndpoint'
+                  - 'ec2:ModifyVpcAttribute'
+                  - 'ec2:ModifySubnetAttribute'
+                  - 'ec2:ModifyImageAttribute'
+                  - 'ec2:ModifyIdentityIdFormat'
+                  - 'ec2:ModifyIdFormat'
+                  - 'ec2:ModifyHosts'
+                  - 'ec2:ModifyFpgaImageAttribute'
+                  - 'ec2:EnableVpcClassicLinkDnsSupport'
+                  - 'ec2:EnableVpcClassicLink'
+                  - 'ec2:EnableVgwRoutePropagation'
+                  - 'ec2:DisassociateVpcCidrBlock'
+                  - 'ec2:DisassociateSubnetCidrBlock'
+                  - 'ec2:DisassociateRouteTable'
+                  - 'ec2:DisableVpcClassicLinkDnsSupport'
+                  - 'ec2:DisableVpcClassicLink'
+                  - 'ec2:DisableVgwRoutePropagation'
+                  - 'ec2:DetachVpnGateway'
+                  - 'ec2:DetachInternetGateway'
+                  - 'ec2:DetachClassicLinkVpc'
+                  - 'ec2:DeleteVpnGateway'
+                  - 'ec2:DeleteVpnConnectionRoute'
+                  - 'ec2:DeleteVpnConnection'
+                  - 'ec2:DeleteVpcPeeringConnection'
+                  - 'ec2:DeleteVpcEndpoints'
+                  - 'ec2:DeleteVpcEndpointServiceConfigurations'
+                  - 'ec2:DeleteVpcEndpointConnectionNotifications'
+                  - 'ec2:DeleteVpc'
+                  - 'ec2:DeleteSubnet'
+                  - 'ec2:DeleteRouteTable'
+                  - 'ec2:DeleteRoute'
+                  - 'ec2:DeleteNetworkAclEntry'
+                  - 'ec2:DeleteNetworkAcl'
+                  - 'ec2:DeleteNatGateway'
+                  - 'ec2:DeleteInternetGateway'
+                  - 'ec2:DeleteFpgaImage'
+                  - 'ec2:DeleteFlowLogs'
+                  - 'ec2:DeleteEgressOnlyInternetGateway'
+                  - 'ec2:DeleteDhcpOptions'
+                  - 'ec2:DeleteCustomerGateway'
+                  - 'ec2:CreateVpnGateway'
+                  - 'ec2:CreateVpnConnectionRoute'
+                  - 'ec2:CreateVpnConnection'
+                  - 'ec2:CreateVpcPeeringConnection'
+                  - 'ec2:CreateVpcEndpointServiceConfiguration'
+                  - 'ec2:CreateVpcEndpointConnectionNotification'
+                  - 'ec2:CreateVpc'
+                  - 'ec2:CreateSubnet'
+                  - 'ec2:CreateRouteTable'
+                  - 'ec2:CreateRoute'
+                  - 'ec2:CreateNetworkAclEntry'
+                  - 'ec2:CreateNetworkAcl'
+                  - 'ec2:CreateNatGateway'
+                  - 'ec2:CreateInternetGateway'
+                  - 'ec2:CreateFlowLogs'
+                  - 'ec2:CreateEgressOnlyInternetGateway'
+                  - 'ec2:CreateDhcpOptions'
+                  - 'ec2:CreateCustomerGateway'
+                  - 'ec2:CreateAppNameVpc'
+                  - 'ec2:CreateAppNameSubnet'
+                  - 'ec2:AttachVpnGateway'
+                  - 'ec2:AttachInternetGateway'
+                  - 'ec2:AttachClassicLinkVpc'
+                  - 'ec2:AssociateVpcCidrBlock'
+                  - 'ec2:AssociateSubnetCidrBlock'
+                  - 'ec2:AssociateRouteTable'
+                  - 'ec2:AssociateDhcpOptions'
+                  - 'ec2:AssignIpv6Addresses'
+                  - 'ec2:AllocateHosts'
+                  - 'ec2:AcceptVpcPeeringConnection'
+                  - 'ec2:AcceptVpcEndpointConnections'
+                  - 'ec2:AcceptReservedInstancesExchangeQuote'
+                  - 'ec2:*Transit*'
+                  - 'ec2:*KeyPair'
+                  - 'cloudtrail:UpdateTrail'
+                  - 'cloudtrail:DeleteTrail'
+                  - 'cloudtrail:CreateTrail'
+                Resource: '*'
+        - PolicyName: !Sub Harness-${ApplicationCI}-DelegatePolicy2
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ExecutionRole
+                Effect: Allow
+                Action: 'iam:PassRole'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/harness-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/eks*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*.amazonaws.com/AWSServiceRoleFor*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/Harness-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/EMR*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/CFExecutionRole_Harness'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/AWSCode*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/harness-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/Harness-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/*'
+              - Sid: AllowAttachPermBoundary
+                Effect: Allow
+                Action:
+                  - 'iam:PutRolePolicy'
+                  - 'iam:PutRolePermissionsBoundary'
+                  - 'iam:PassRole'
+                  - 'iam:DetachRolePolicy'
+                  - 'iam:DeleteRolePolicy'
+                  - 'iam:CreateRole'
+                  - 'iam:AttachRolePolicy'
+                  - 'iam:AssumeRole'
+                Condition:
+                  StringEquals:
+                    'iam:PermissionsBoundary': 'arn:aws:iam::${AWS::AccountId}:policy/AppPolicy_Harness'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/harness-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/Harness-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/*'
+              - Sid: ServiceCreateRole
+                Effect: Allow
+                Action:
+                  - 'iam:PutRolePolicy'
+                  - 'iam:PassRole'
+                  - 'iam:DeleteRolePolicy'
+                  - 'iam:DeleteRole'
+                  - 'iam:CreateRole'
+                  - 'iam:AttachRolePolicy'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/*.amazonaws.com/AWSServiceRoleFor*'
+              - Effect: Allow
+                Action: 'ec2:CreateVpcEndpoint'
+                Condition:
+                  'ForAnyValue:StringEquals':
+                    'aws:TagKeys': AmazonMWAAManaged
+                Resource: 'arn:aws:ec2:*:*:vpc-endpoint/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:ModifyVpcEndpoint'
+                  - 'ec2:DeleteVpcEndpoints'
+                Condition:
+                  'Null':
+                    'aws:ResourceTag/AmazonMWAAManaged': 'false'
+                Resource: 'arn:aws:ec2:*:*:vpc-endpoint/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:ModifyVpcEndpoint'
+                  - 'ec2:CreateVpcEndpoint'
+                Resource:
+                  - !Sub 'arn:aws:ec2:*:*:vpc/*'
+                  - !Sub 'arn:aws:ec2:*:*:subnet/*'
+                  - !Sub 'arn:aws:ec2:*:*:security-group/*'
+              - Sid: EKSOIDCCreateAndTagging
+                Effect: Allow
+                Action:
+                  - 'iam:UntagOpenIDConnectProvider'
+                  - 'iam:TagOpenIDConnectProvider'
+                  - 'iam:DeleteOpenIDConnectProvider'
+                  - 'iam:CreateOpenIDConnectProvider'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/oidc.eks.*.amazonaws.com/id/*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/oidc.eks.*.amazonaws.com'
+              - Sid: AllowReadIAMActions
+                Effect: Allow
+                Action:
+                  - 'iam:UpdateOpenIDConnectProviderThumbprint'
+                  - 'iam:UntagUser'
+                  - 'iam:UntagRole'
+                  - 'iam:UntagPolicy'
+                  - 'iam:TagUser'
+                  - 'iam:TagRole'
+                  - 'iam:TagPolicy'
+                  - 'iam:Simulate*'
+                  - 'iam:ListUserTag'
+                  - 'iam:ListRoleTags'
+                  - 'iam:List*'
+                  - 'iam:Get*'
+                  - 'iam:Generate*'
+                  - 'iam:CreateServiceLinkedRole'
+                  - 'iam:*InstanceProfile'
+                  - 'ec2:DescribeVpcEndpoint*'
+                Resource: '*'
+              - Sid: NoBoundaryPolicyEdit
+                Effect: Deny
+                Action:
+                  - 'iam:SetDefaultPolicyVersion'
+                  - 'iam:DeletePolicyVersion'
+                  - 'iam:DeletePolicy'
+                  - 'iam:CreatePolicyVersion'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/AppPolicy_Harness'
+              - Sid: DenyBoundaryPolicyDelete
+                Effect: Deny
+                Action: 'iam:DeleteRolePermissionsBoundary'
+                Resource: '*'
+              - Sid: AllowOtherIAMActions
+                Effect: Allow
+                Action:
+                  - 'iam:UpdateRoleDescription'
+                  - 'iam:UpdateRole'
+                  - 'iam:UpdateAssumeRolePolicy'
+                  - 'iam:RemoveRoleFromInstanceProfile'
+                  - 'iam:DetachRolePolicy'
+                  - 'iam:DeleteRolePolicy'
+                  - 'iam:DeleteRole'
+                  - 'iam:DeletePolicyVersion'
+                  - 'iam:DeletePolicy'
+                  - 'iam:DeleteInstanceProfile'
+                  - 'iam:CreateRole'
+                  - 'iam:CreatePolicyVersion'
+                  - 'iam:CreatePolicy'
+                  - 'iam:CreateInstanceProfile'
+                  - 'iam:AddRoleToInstanceProfile'
+                Resource:
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:role/harness-*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:role/eksctl*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:role/*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:policy/harness-*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:policy/eksctl*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:policy/*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:instance-profile/harness-*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:instance-profile/eksctl*'
+                  - !Sub 'iam:aws:iam::${AWS::AccountId}:instance-profile/*'
+              - Sid: CreateServiceLinkedRole
+                Effect: Allow
+                Action: 'iam:CreateServiceLinkedRole'
+                Resource: '*'
+              - Sid: AllowS3Actions
+                Action: s3:*
+                Effect: Allow
+                Resource: '*'
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref ApplicationCI
+        - Key: Environment
+          Value: !Ref Environment
+
+## Outputs ##
+Outputs:
+  HarnesssafCDDelegateRoleExport:
+    Value: !GetAtt 'HarnesssafCDDelegateRole.Arn'
+    Export:
+      Name: !Sub Harness-${ApplicationCI}-CDDelegateRoleArn
+
+

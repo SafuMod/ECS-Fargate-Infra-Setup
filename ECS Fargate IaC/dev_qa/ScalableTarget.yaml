@@ -1,0 +1,4 @@
+serviceNamespace: ecs
+scalableDimension: ecs:service:DesiredCount
+minCapacity: <+stage.variables.minCapacity>
+maxCapacity: <+stage.variables.maxCapacity>

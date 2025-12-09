@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create a KMS key and a Kinesis Data Stream with encryption enabled
+
+Parameters:
+  AppCI:
+    Type: String
+    Description: Application CI Identifier
+  Environment:
+    Type: String
+    Description: Deployment Environment (e.g., dev, qa, stg, prod)
+
+Resources:
+  safKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: 'Customer-managed KMS key for Kinesis Data Stream encryption'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Sub arn:aws:iam::${AWS::AccountId}:root
+                - arn:aws:iam::207138240216:root
+            Action: kms:*
+            Resource: '*'
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref AppCI
+        - Key: env
+          Value: !Ref Environment
+
+  safKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/saf-kinesis-kms-key
+      TargetKeyId: !Ref safKMSKey
+
+  safUDHKinesisDataStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: saf-test-UDH-DATA-STREAM
+      StreamModeDetails:
+        StreamMode: ON_DEMAND
+      StreamEncryption:
+        EncryptionType: KMS
+        KeyId: !Ref safKMSKey
+      Tags:
+        - Key: ApplicationCI
+          Value: !Ref AppCI
+        - Key: env
+          Value: !Ref Environment
+
+Outputs:
+  KMSKeyArn:
+    Description: ARN of the created KMS Key
+    Value: !GetAtt safKMSKey.Arn
+
+  KinesisStreamArn:
+    Description: ARN of the created Kinesis Data Stream
+    Value: !GetAtt safUDHKinesisDataStream.Arn
